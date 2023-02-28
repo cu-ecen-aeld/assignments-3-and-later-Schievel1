@@ -4,21 +4,31 @@
 # @file
 # @version 0.1
 
-CC ?= gcc
-CFLAGS += -Wall
-CFLAGS += -Werror
+INCLUDES ?=
+LIB_DIRS =
+CROSS_COMPILE =
+CC ?= $(CROSS_COMPILE)gcc
+TARGET ?= aesdsocket
 
-ifeq ($(DEBUG),true)
-	CFLAGS += -g
-endif
+CFLAGS ?= -O0 -g -Wall -Werror
+LDFLAGS ?= -pthread -lrt
 
+HFILES = queue.h
+CFILES = $(TARGET).c
 
-default all:
-	$(CROSS_COMPILE)$(CC) $(CFLAGS) aesdsocket.c -o aesdsocket
+SRCS = ${HFILES} ${CFILES}
+OBJS = ${CFILES:.c=.o}
+
+all:	$(TARGET)
 
 clean:
-	rm -rf *.o aesdsocket
-# end
+	-rm -f *.o *.d
+	-rm -f $(TARGET)
 
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) $^ -o $@ $(INCLUDES) $(LDFLAGS)
 
-# end
+depend:
+
+.c.o:
+	$(CC) $(CFLAGS) $(INCLUDES) -c $<
