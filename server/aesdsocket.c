@@ -361,11 +361,6 @@ int main(int argc, char *argv[]) {
       break;
     }
 
-  FILE *data_fd = fopen(DATA_PATH, "a+");
-  if (data_fd == NULL) {
-    printf("Could not open data file: %m\n");
-    goto fail;
-  }
 
 #if USE_AESD_CHAR_DEVICE==0
   ret = timer_create(CLOCK_REALTIME, NULL, &s_data.timer);
