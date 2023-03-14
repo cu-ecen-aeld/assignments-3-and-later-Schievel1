@@ -16,7 +16,12 @@
 #include <stdbool.h>
 
 #define BUFFER_SIZE 100
+#define USE_AESD_CHAR_DEVICE 1
+#if USE_AESD_CHAR_DEVICE==1
+#define DATA_PATH "/dev/aesdchar"
+#else
 #define DATA_PATH "/var/tmp/aesdsocketdata"
+#endif
 #define MAX_ACCEPT 10
 
 int32_t socket_fd;
@@ -233,6 +238,7 @@ free_socket_fd:
 
 static void signal_handler(int signal_number) { s_data.trigger = true; }
 
+#if USE_AESD_CHAR_DEVICE==0
 static void alarm_handler() {
   time_t rawtime;
   struct tm *info;
@@ -254,6 +260,7 @@ static void alarm_handler() {
     q.q_full = true;
   }
 }
+#endif // USE_AESD_CHAR_DEVICE==0
 static void shutdown_function() {
   syslog(LOG_INFO, "Caught signal, exiting");
   remove(DATA_PATH);
@@ -305,10 +312,12 @@ int main(int argc, char *argv[]) {
   if (sigaction(SIGINT, &saction, NULL) != 0) {
     syslog(LOG_ERR, "Error registering SIGINT: %m");
   }
+#if USE_AESD_CHAR_DEVICE==0
   saction.sa_handler = alarm_handler;
   if (sigaction(SIGALRM, &saction, NULL) != 0) {
     syslog(LOG_ERR, "Error registering SIGALRM: %m");
   }
+#endif//  USE_AESD_CHAR_DEVICE==0
 
   socket_fd = socket(PF_INET, SOCK_STREAM, 0);
   if (socket_fd < 0) {
@@ -357,6 +366,8 @@ int main(int argc, char *argv[]) {
     printf("Could not open data file: %m\n");
     goto fail;
   }
+
+#if USE_AESD_CHAR_DEVICE==0
   ret = timer_create(CLOCK_REALTIME, NULL, &s_data.timer);
   if (ret == -1) {
     syslog(LOG_ERR, "timer create error %m\n");
@@ -371,6 +382,7 @@ int main(int argc, char *argv[]) {
     syslog(LOG_ERR, "timer_settime error %m\n");
     return -1;
   }
+#endif // USE_AESD_CHAR_DEVICE==0
 
   s_data.disarm_alarm = true;
   head_t head;

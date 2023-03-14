@@ -38,17 +38,19 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(
   struct aesd_buffer_entry *curr_entry = &buffer->entry[buffer->out_offs];
   int i = buffer->out_offs;
   bool around = false;
-  while (my_char_offset > curr_entry->size - 1) { // - 1 because size is not 0 inclusive
+  while (my_char_offset >
+         curr_entry->size - 1) { // - 1 because size is not 0 inclusive
     my_char_offset = my_char_offset - curr_entry->size;
     curr_entry++;
     i++;
     if (i >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED) {
-        i = 0;
-        curr_entry = &buffer->entry[0];
-        around = true;
+      i = 0;
+      curr_entry = &buffer->entry[0];
+      around = true;
     }
   }
-  if (&buffer->entry[buffer->out_offs] == curr_entry && around) return NULL;
+  if (&buffer->entry[buffer->out_offs] == curr_entry && around)
+    return NULL;
   *entry_offset_byte_rtn = my_char_offset;
   return curr_entry;
 }
@@ -61,8 +63,13 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(
  * add_entry must be allocated by and/or must have a lifetime managed by the
  * caller.
  */
-void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer,
-                                    const struct aesd_buffer_entry *add_entry) {
+const char *
+aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer,
+                               const struct aesd_buffer_entry *add_entry) {
+  const char *oldst_entry = NULL;
+  // if buf is full, save oldest entry to return later
+  if (buffer->full)
+    oldst_entry = buffer->entry[buffer->out_offs].buffptr;
   buffer->entry[buffer->in_offs] = *add_entry;
   buffer->in_offs++;
   if (buffer->in_offs >= AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED)
@@ -74,6 +81,7 @@ void aesd_circular_buffer_add_entry(struct aesd_circular_buffer *buffer,
   }
   if (buffer->in_offs == buffer->out_offs)
     buffer->full = true;
+  return oldst_entry;
 }
 
 /**
