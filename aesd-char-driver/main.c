@@ -17,6 +17,7 @@
 #include <linux/module.h>
 #include <linux/printk.h>
 #include <linux/types.h>
+#include <linux/slab.h>
 #include "aesdchar.h"
 
 int aesd_major = 0; // use dynamic major

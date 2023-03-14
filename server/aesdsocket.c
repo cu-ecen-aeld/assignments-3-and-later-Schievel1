@@ -181,7 +181,7 @@ static void *threadfn(void *thread_param) {
             goto free_mem;
           }
           file_fd = open(DATA_PATH, O_RDWR | O_CREAT | O_APPEND,
-                         S_IRWXU | S_IRWXG | S_IRWXO);
+                         0777);
           if (file_fd == -1) {
             syslog(LOG_ERR, "Open: %m");
             goto unlock_mutex;
@@ -456,7 +456,7 @@ int main(int argc, char *argv[]) {
           ret = pthread_mutex_trylock(&s_data.mutex);
           if (ret == 0) {
             int fd = open(DATA_PATH, O_WRONLY | O_CREAT | O_APPEND,
-                          S_IRWXU | S_IRWXG | S_IRWXO);
+                          0777);
             if (fd != -1) {
               printf("File desc %d\n", fd);
               write_data(fd, time_val_buf, strlen(time_val_buf));
