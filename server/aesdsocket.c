@@ -14,6 +14,7 @@
 #include "queue.h"
 #include <pthread.h>
 #include <stdbool.h>
+#include "../aesd-char-driver/aesd_ioctl.h"
 
 #define BUFFER_SIZE 100
 #define USE_AESD_CHAR_DEVICE 1
@@ -78,23 +79,37 @@ s_data_t s_data;
 #define BUFFER_STD_SIZE 256
 static int write_data(int fd, char *string, int write_len) {
   ssize_t ret;
-  while (write_len != 0) {
-    ret = write(fd, string, write_len);
-    if (ret == 0) {
-      break;
+  if (strncmp(string, "AESDCHAR_IOCSEEKTO:", strlen("AESDCHAR_IOCSEEKTO:")) ==
+      0) {
+    struct aesd_seekto pos;
+    sscanf(string, "AESDCHAR_IOCSEEKTO:%d,%d", &pos.write_cmd,
+           &pos.write_cmd_offset);
+    syslog(LOG_INFO, "Sending ioctl with %d,%d\n",pos.write_cmd, pos.write_cmd_offset);
+    if (ioctl(fd, AESDCHAR_IOCSEEKTO, &pos)) {
+      syslog(LOG_ERR, "Error sending ioctl: %m\n");
+      return 1;
     }
-    if (ret == -1) {
-      if (errno == EINTR) {
-        continue;
+    return 0;
+  } else {
+    while (write_len != 0) {
+      ret = write(fd, string, write_len);
+      if (ret == 0) {
+        break;
       }
-      syslog(LOG_ERR, "write error %m\n");
-      return -1;
+      if (ret == -1) {
+        if (errno == EINTR) {
+          continue;
+        }
+        syslog(LOG_ERR, "write error %m\n");
+        return -1;
+      }
+      write_len -= ret;
+      string += ret;
     }
-    write_len -= ret;
-    string += ret;
+    return 0;
   }
-  return 0;
 }
+
 static int echo_file_socket(int fd, int acceptfd) {
   ssize_t ret;
   char write_str[BUFFER_STD_SIZE];
@@ -182,6 +197,7 @@ static void *threadfn(void *thread_param) {
           }
           file_fd = open(DATA_PATH, O_RDWR | O_CREAT | O_APPEND,
                          0777);
+          syslog(LOG_INFO, "opend send_t filedesr %d", file_fd);
           if (file_fd == -1) {
             syslog(LOG_ERR, "Open: %m");
             goto unlock_mutex;
@@ -191,7 +207,7 @@ static void *threadfn(void *thread_param) {
           if (write_data(file_fd, &buffer[start_ptr], newline_data) == -1) {
             goto close_filefd;
           }
-          lseek(file_fd, 0, SEEK_SET);
+          /* lseek(file_fd, 0, SEEK_SET); */ // this is not working when we want to do assignment 9
 
           if (echo_file_socket(file_fd, thread_params->fd) == -1) {
             goto close_filefd;

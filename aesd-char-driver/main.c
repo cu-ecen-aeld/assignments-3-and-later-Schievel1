@@ -19,6 +19,7 @@
 #include <linux/types.h>
 #include <linux/slab.h>
 #include "aesdchar.h"
+#include "aesd_ioctl.h"
 
 int aesd_major = 0; // use dynamic major
 int aesd_minor = 0;
@@ -162,12 +163,82 @@ fail:
   return retval;
 }
 
+static long aesd_adjust_file_offset(struct file *filp, unsigned int write_cmd, unsigned int write_cmd_offset)
+{
+    int i;
+		int tmppos;
+		int retval = 0;
+
+    struct aesd_dev *dev_p = filp->private_data;
+
+    mutex_lock(&aesd_device.buf_mtx);
+
+    if (write_cmd > (AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED - 1)) {
+        retval = -EINVAL;
+        goto fail;
+    }
+    if (write_cmd_offset >= dev_p->kbuf.entry[write_cmd].size) {
+        retval = -EINVAL;
+        goto fail;
+    }
+    tmppos = 0;
+    for (i = 0; i < write_cmd; i++) {
+        if (dev_p->kbuf.entry[i].size == 0) {
+            retval = -EINVAL;
+            goto fail;
+        }
+        tmppos += dev_p->kbuf.entry[i].size;
+    }
+    tmppos += write_cmd_offset;
+    filp->f_pos = tmppos;
+
+fail:
+    mutex_unlock(&aesd_device.buf_mtx);
+    return retval;
+}
+
+long aesd_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+{
+    long retval = 0;
+    struct aesd_seekto pos;
+
+    if ((_IOC_TYPE(cmd) != AESD_IOC_MAGIC) || (_IOC_NR(cmd) > AESDCHAR_IOC_MAXNR))
+        return -ENOTTY;
+    switch (cmd)
+    {
+    case AESDCHAR_IOCSEEKTO:
+        if (copy_from_user(&pos, (const void __user *)arg, sizeof(pos)) != 0)
+            retval = -EFAULT;
+        else
+            retval = aesd_adjust_file_offset(filp, pos.write_cmd, pos.write_cmd_offset);
+        break;
+
+    default:
+        retval = -ENOTTY;
+        break;
+    }
+
+    return retval;
+}
+
+loff_t aesd_llseek(struct file *filp, loff_t off, int whence)
+{
+    loff_t retval;
+    struct aesd_dev *dev_p = filp->private_data;
+    mutex_lock(&aesd_device.buf_mtx);
+    retval = fixed_size_llseek(filp, off, whence, dev_p->kbuf.bufsize);
+    mutex_unlock(&aesd_device.buf_mtx);
+    return retval;
+}
+
 struct file_operations aesd_fops = {
     .owner = THIS_MODULE,
     .read = aesd_read,
     .write = aesd_write,
     .open = aesd_open,
     .release = aesd_release,
+		.llseek = aesd_llseek,
+		.unlocked_ioctl = aesd_ioctl,
 };
 
 static int aesd_setup_cdev(struct aesd_dev *dev) {
