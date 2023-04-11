@@ -4,17 +4,18 @@
 # @file
 # @version 0.1
 
-CC ?= gcc
-CFLAGS += -Wall
-CFLAGS += -Werror
+CC = $(CROSS_COMPILE)gcc
+CFLAGS = -Wall -Werror
+SRCS = writer.c
+OBJS = $(SRCS:.c=.o) #replace .c file
+TARGET = $(SRCS:.c=) #replace .c with nothing"" for eg. writer.c => writer
 
-ifeq ($(DEBUG),true)
-	CFLAGS += -g
-endif
+all: $(TARGET)
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
 
-default:
-	$(CROSS_COMPILE)gcc writer.c -o writer
+.c.o:
+	$(CC) -c  $(SRCS)
 
 clean:
-	rm -rf *.o writer
-# end
+	rm -f $(TARGET) *.o
